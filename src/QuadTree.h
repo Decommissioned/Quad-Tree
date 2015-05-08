@@ -7,6 +7,10 @@
 #include <memory>
 #include <vector>
 
+// TODO: Outward growth
+// TODO: Remove operations
+// TODO: Optimize
+
 #pragma inline_recursion(on)
 
 static unsigned int COLOR_TABLE[] = {
@@ -45,13 +49,6 @@ namespace ORC_NAMESPACE
 
                 static const unsigned char max_depth = 16;
                 const size_t node_capacity;
-
-                //  _________
-                // | 2  | 3  |
-                // |____|____|
-                // | 0  | 1  |
-                // |____|____|
-
 
                 enum Rose { NORTHEAST = 3, SOUTHEAST = 2, SOUTHWEST = 0, NORTHWEST = 1 };
 
