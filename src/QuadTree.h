@@ -43,7 +43,7 @@ static unsigned int COLOR_TABLE[] = {
 namespace ORC_NAMESPACE
 {
 
-        template <typename allocator_type = std::allocator<vec2>>
+        template <typename type_p, typename allocator_type = std::allocator<type_p>>
         class QuadTree final
         {
 
@@ -63,21 +63,21 @@ namespace ORC_NAMESPACE
                         AABB region;
                         size_t size;
                         size_t capacity;
-                        vec2* content;
+                        type_p* content;
                 };
 
                 using alloc_t = std::allocator_traits < allocator_type > ;
                 using NodeAlloc = typename alloc_t::template rebind_alloc < QuadTreeNode > ;
-                using VecAlloc = typename alloc_t::template rebind_alloc < vec2 > ;
+                using VecAlloc = typename alloc_t::template rebind_alloc < type_p > ;
 
                 NodeAlloc node_alloc;
                 VecAlloc vec_alloc;
 
                 QuadTreeNode root;
 
-                static unsigned int partition(const vec2* center, const vec2* point)
+                static unsigned int partition(const vec2& center, const vec2& point)
                 {
-                        return ((point->x > center->x) << 1) | (point->y > center->y);
+                        return ((point.x > center.x) << 1) | (point.y > center.y);
                 }
 
                 static void inc_depth(QuadTreeNode* node)
@@ -89,12 +89,11 @@ namespace ORC_NAMESPACE
                         }
                 }
 
-                void insert(QuadTreeNode* node, const vec2* point)
+                void insert(QuadTreeNode* node, const type_p* point)
                 {
                         if (node->children != nullptr) // internal node, descend
                         {
-                                vec2 center = node->region.Center();
-                                unsigned int child_index = partition(&center, point);
+                                unsigned int child_index = partition(node->region.Center(), point->Position());
                                 insert(&node->children[child_index], point);
                         }
                         else // leaf node
@@ -107,8 +106,8 @@ namespace ORC_NAMESPACE
                                         else // if maximum depth has been reached, simply reallocate memory for the node
                                         {
                                                 node->capacity += node_capacity;
-                                                vec2* new_content = vec_alloc.allocate(node->capacity, node);
-                                                std::memcpy(new_content, node->content, sizeof(vec2) * node->size);
+                                                type_p* new_content = vec_alloc.allocate(node->capacity, node);
+                                                std::memcpy(new_content, node->content, sizeof(type_p) * node->size);
                                                 vec_alloc.deallocate(node->content, node->size);
                                                 node->content = new_content;
                                         }
@@ -137,9 +136,9 @@ namespace ORC_NAMESPACE
                         parent->children[NORTHEAST].region = AABB(parent->region.TopRight(), center);
 
                         // Copying existing points to the correct child
-                        for (vec2* point = parent->content; point != parent->content + parent->size; ++point)
+                        for (type_p* point = parent->content; point != (parent->content + parent->size); ++point)
                         {
-                                unsigned int child_index = partition(&center, point);
+                                unsigned int child_index = partition(center, point->Position());
                                 insert(&parent->children[child_index], point);
                         }
 
@@ -151,12 +150,10 @@ namespace ORC_NAMESPACE
 
                 void expand(vec2 point) // This is extremely slow, it's best to avoid adding elements outside of the region altogether
                 {
-                        vec2 ne;
-                        vec2 sw;
-
+                        vec2 ne, sw;
                         unsigned int target;
 
-                        switch (partition(&root.region.Center(), &point))
+                        switch (partition(root.region.Center(), point))
                         {
                         case SOUTHWEST:
                                 ne = root.region.TopRight();
@@ -205,7 +202,6 @@ namespace ORC_NAMESPACE
                                         case NORTHEAST: pos = region.TopRight(); break;
                                         case NORTHWEST: pos = region.TopLeft(); break;
                                         }
-
                                         intermediates[k].region = AABB(pos, region.Center());
                                 }
 
@@ -220,7 +216,7 @@ namespace ORC_NAMESPACE
                         root.children = intermediates;
                 }
 
-                void query(std::vector<vec2>& vec, const AABB& region, const QuadTreeNode* node) const
+                void query(std::vector<type_p*>& results, const AABB& region, const QuadTreeNode* node) const
                 {
                         if (node->children != nullptr) // internal node, descend
                         {
@@ -228,16 +224,16 @@ namespace ORC_NAMESPACE
                                 {
                                         QuadTreeNode* child = &node->children[k];
                                         if (child->region.Intersect(region))
-                                                query(vec, region, child);
+                                                query(results, region, child);
                                 }
                         }
                         else // leaf node
                         {
                                 for (size_t k = 0; k < node->size; ++k)
                                 {
-                                        vec2 point = node->content[k];
-                                        if (region.Inside(point))
-                                                vec.emplace_back(point);
+                                        type_p& item = node->content[k];
+                                        if (region.Inside(item.Position()))
+                                                results.emplace_back(&item);
                                 }
                         }
                 }
@@ -265,7 +261,7 @@ namespace ORC_NAMESPACE
                         {
                                 for (size_t k = 0; k < node->size; ++k)
                                 {
-                                        vec2 point = node->content[k];
+                                        vec2 point = node->content[k].Position();
                                         int x = (int) ceilf(point.x);
                                         int y = (int) ceilf(point.y);
                                         if (x >= 0 && x < 800 && y >= 0 && y < 600)
@@ -312,20 +308,22 @@ namespace ORC_NAMESPACE
                         free(&root);
                 }
 
-                void Insert(const vec2& point)
+                void Insert(const type_p& item)
                 {
-                        while (!root.region.Inside(point))
-                                expand(point);
+                        while (!root.region.Inside(item.Position()))
+                                expand(item.Position());
 
-                        insert(&root, &point);
+                        insert(&root, &item);
                 }
 
-                std::vector<vec2> Query(const AABB& region) const
+                std::vector<type_p*> Query(const AABB& region) const
                 {
-                        // TODO: create allocation heuristic
-                        std::vector<vec2> vec;
+                        std::vector<type_p*> results;
+
                         if (root.region.Intersect(region))
-                                query(vec, region, &root);
+                                query(results, region, &root);
+
+                        return results;
                 }
 
                 void Render(unsigned int* buffer) const
