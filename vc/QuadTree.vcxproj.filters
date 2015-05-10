@@ -33,11 +33,11 @@
     <ClInclude Include="..\src\config.h">
       <Filter>Header Files\src</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\SmartPoolAllocator.h">
+      <Filter>Header Files\src</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\QuadTree.cpp">
-      <Filter>Source Files\src</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\AABB.cpp">
       <Filter>Source Files\src</Filter>
     </ClCompile>

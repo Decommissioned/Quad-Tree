@@ -69,10 +69,10 @@
     <ClInclude Include="..\src\AABB.h" />
     <ClInclude Include="..\src\config.h" />
     <ClInclude Include="..\src\QuadTree.h" />
+    <ClInclude Include="..\src\SmartPoolAllocator.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\AABB.cpp" />
-    <ClCompile Include="..\src\QuadTree.cpp" />
     <ClCompile Include="..\test\Source.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
