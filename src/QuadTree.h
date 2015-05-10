@@ -44,13 +44,14 @@ static unsigned int COLOR_TABLE[] = {
 namespace ORC_NAMESPACE
 {
 
+        template <typename allocator_type = std::allocator<vec2>>
         class QuadTree final
         {
 
                 static const unsigned char max_depth = 16;
                 const size_t node_capacity;
 
-                enum Rose { NORTHEAST = 3, SOUTHEAST = 2, SOUTHWEST = 0, NORTHWEST = 1 };
+                enum { NORTHEAST = 3, SOUTHEAST = 2, SOUTHWEST = 0, NORTHWEST = 1 };
 
                 struct QuadTreeNode
                 {
@@ -62,9 +63,15 @@ namespace ORC_NAMESPACE
                         size_t capacity;
                         vec2* content;
                 };
+               
+                using alloc_t = std::allocator_traits < allocator_type > ;
+                using NodeAlloc = typename alloc_t::template rebind_alloc < QuadTreeNode > ;
+                using VecAlloc = typename alloc_t::template rebind_alloc < vec2 > ;
 
-                std::allocator<QuadTreeNode> node_alloc;
-                std::allocator<vec2> vec_alloc;
+                NodeAlloc node_alloc;
+                VecAlloc vec_alloc;
+
+                QuadTreeNode root;
 
                 unsigned int partition(const vec2* center, const vec2* point)
                 {
@@ -131,6 +138,28 @@ namespace ORC_NAMESPACE
                         parent->content = nullptr;
                 }
 
+                void expand(vec2 point)
+                {
+                        switch (partition(&root.region.Center(), &point))
+                        {
+                        case SOUTHWEST:
+
+                                break;
+
+                        case SOUTHEAST:
+                                
+                                break;
+
+                        case NORTHEAST:
+
+                                break;
+
+                        case NORTHWEST:
+
+                                break;
+                        }
+                }
+
                 void query(std::vector<vec2>& vec, const AABB& region, const QuadTreeNode* node) const
                 {
                         if (node->children != nullptr) // internal node, descend
@@ -192,12 +221,7 @@ namespace ORC_NAMESPACE
                         node->region.Render(buffer, COLOR_TABLE[node->depth]);
                 }
 
-                QuadTreeNode root;
-
-        public:
-
-                QuadTree(const AABB& region, const size_t capacity_hint = 10U) :
-                        node_capacity(capacity_hint)
+                void init_root(const AABB& region)
                 {
                         root.region = region;
                         root.size = 0;
@@ -206,6 +230,21 @@ namespace ORC_NAMESPACE
                         root.content = vec_alloc.allocate(node_capacity, &root);
                         root.depth = 0;
                         root.capacity = node_capacity;
+                }
+
+        public:
+
+                explicit QuadTree(const AABB& region, const size_t capacity_hint = 10U) :
+                        node_capacity(capacity_hint)
+                {
+                        init_root(region);
+
+                }
+
+                explicit QuadTree(const AABB& region, allocator_type& allocator, const size_t capacity_hint = 10U) :
+                        node_capacity(capacity_hint), node_alloc(allocator), vec_alloc(allocator)
+                {
+                        init_root(region);
                 }
 
                 ~QuadTree()
