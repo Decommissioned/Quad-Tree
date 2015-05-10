@@ -22,16 +22,16 @@ namespace ORC_NAMESPACE
                 return static_cast<char*>(address) +offset;
         }
 
-        struct Bookeeper
+        struct Bookkeeper
         {
                 size_t size;
-                Bookeeper* next;
+                Bookkeeper* next;
         };
         struct MemoryPool
         {
                 void* end;
                 void* current;
-                Bookeeper* bk_first;
+                Bookkeeper* bk_first;
         };
 
         // I totally leak memory if you don't free me after you're done
@@ -58,6 +58,7 @@ namespace ORC_NAMESPACE
         Freeing memory will speed it back up a bit, however if the sizes of the allocations vary a lot memory fragmentation will become a serious issue.
         REMARK: When using this allocator with a container (like STL) you will have to ensure that the pool's memory will be available until all containers using it are DESTROYED.
         REMARK: For STL containers, a constructed instance of the allocator should be passed a parameter to the container's constructor, otherwise states will not work
+        REMARK: If no memory pool is provided, the standard allocator will be used instead
         TODO: Concatenate adjacent memory in bookkeeping list, haven't thought of a good way of doing this yet
         */
         template <typename T>
@@ -70,7 +71,7 @@ namespace ORC_NAMESPACE
                 using value_type = T;
                 using propagate_on_container_move_assignment = std::true_type;
 
-                SmartPoolAllocator() = delete;
+                SmartPoolAllocator() throw() = delete;
                 SmartPoolAllocator(MemoryPool* pool) throw() : pool(pool)
                 {}
                 template <typename U> SmartPoolAllocator(const SmartPoolAllocator<U>& o) throw() : pool(o.pool)
@@ -86,7 +87,7 @@ namespace ORC_NAMESPACE
                 {
                         // If the requested size is too small we have to live with either not being able to use bookkeeping or over allocate
                         size_t requested_bytes = size * sizeof(T);
-                        size_t actual_bytes = requested_bytes > sizeof(Bookeeper) ? requested_bytes : sizeof(Bookeeper);
+                        size_t actual_bytes = requested_bytes > sizeof(Bookkeeper) ? requested_bytes : sizeof(Bookkeeper);
 
                         // First of all, alignment requirements are checked, we can ignore the original pointer since std::free wont be needing it
                         size_t align_size = alignment_needed(pool->current);
@@ -97,8 +98,8 @@ namespace ORC_NAMESPACE
                         if (next >= pool->end)
                         {
                                 // Even if no more memory is available in the pool, it's possible that there is still enough memory for an allocation in the bookkeeping list
-                                Bookeeper* prev = nullptr;
-                                Bookeeper* node = pool->bk_first;
+                                Bookkeeper* prev = nullptr;
+                                Bookkeeper* node = pool->bk_first;
                                 while (node)
                                 {
                                         if (node->size >= actual_bytes) // Does it fit?
@@ -151,7 +152,7 @@ namespace ORC_NAMESPACE
                         }
 
                         // Add the memory to bookkeeping list
-                        Bookeeper* node = reinterpret_cast<Bookeeper*>(ptr);
+                        Bookkeeper* node = reinterpret_cast<Bookkeeper*>(ptr);
                         node->next = pool->bk_first;
                         node->size = n * sizeof(T);
                         pool->bk_first = node;
