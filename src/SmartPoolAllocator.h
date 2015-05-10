@@ -5,11 +5,13 @@
 #include <memory>
 #include <iostream>
 
-#define SMARTALLOCATOR_DIAGNOSTICS 0
+#define SMARTALLOCATOR_DIAGNOSTICS 1
 
 namespace ORC_NAMESPACE
 {
-
+        /*
+        Calculates the alignment requirement for the memory address
+        */
         inline static size_t alignment_needed(void* address)
         {
                 const size_t alignment = sizeof(void*);
@@ -34,7 +36,10 @@ namespace ORC_NAMESPACE
                 Bookkeeper* bk_first;
         };
 
-        // I totally leak memory if you don't free me after you're done
+        /*
+        Description: creates a block of memory that can be used by allocators
+        Remark: std::free must be called on it after using it, otherwise the memory will leak
+        */
         MemoryPool* MakeMemoryPool(size_t size)
         {
                 size_t actual = size + sizeof(MemoryPool);
@@ -42,13 +47,6 @@ namespace ORC_NAMESPACE
                 pool->end = (char*) pool + actual;
                 pool->current = (char*) pool + sizeof(MemoryPool);
                 pool->bk_first = nullptr;
-
-                if (SMARTALLOCATOR_DIAGNOSTICS)
-                {
-                        std::cout << "pool: [0x" << pool << "]\n"
-                                << "pool->end: [0x" << pool->end << "]\n"
-                                << "pool->current: [0x" << pool->current << ']' << std::endl;
-                }
 
                 return pool;
         }
@@ -82,7 +80,6 @@ namespace ORC_NAMESPACE
                 ~SmartPoolAllocator() throw()
                 {}
 
-                // This is a relatively complex implementation, but the performance should be blazingly fast
                 T* allocate(size_t size, void* = 0)
                 {
                         // If the requested size is too small we have to live with either not being able to use bookkeeping or over allocate
@@ -97,24 +94,20 @@ namespace ORC_NAMESPACE
                         void* next = ptr_add(address, actual_bytes);
                         if (next >= pool->end)
                         {
-                                // Even if no more memory is available in the pool, it's possible that there is still enough memory for an allocation in the bookkeeping list
+                                // Pool is full, search for available rooms
                                 Bookkeeper* prev = nullptr;
                                 Bookkeeper* node = pool->bk_first;
                                 while (node)
                                 {
-                                        if (node->size >= actual_bytes) // Does it fit?
+                                        if (node->size >= actual_bytes) // Does it fit? Alignment checks not needed here, it's already aligned
                                         {
                                                 if (SMARTALLOCATOR_DIAGNOSTICS)
-                                                        std::cout << "Found " << node->size << " bytes in the bookkeeping tree at [0x" << node << ']' << std::endl;
+                                                        std::cout << "Bookkeeping: claimed " << node->size << " bytes at [0x" << node << ']' << std::endl;
 
-                                                if (prev != nullptr) // Re-link the list if necessary
-                                                {
-                                                        prev->next = node->next;
-                                                }
-                                                else // Make the next element the beginning of the list
-                                                {
-                                                        pool->bk_first = node->next;
-                                                }
+                                                // Make the previous node point to the next node
+                                                if (prev != nullptr) prev->next = node->next;
+                                                // First node in the list, make the head point to the next element
+                                                else pool->bk_first = node->next;
 
                                                 return reinterpret_cast<T*>(node);
                                         }
@@ -123,42 +116,42 @@ namespace ORC_NAMESPACE
                                         node = node->next;
                                 }
 
+                                // No room to perform allocation, use fallback allocator
                                 if (SMARTALLOCATOR_DIAGNOSTICS)
-                                        std::cout << "No memory available, using fallback allocator" << std::endl;
+                                        std::cout << "Allocation: no memory, using fallback allocator" << std::endl;
 
-                                // If so, a fallback allocator is used, which is slow but will prevent the program from crashing
                                 return fallback.allocate(size);
                         }
 
                         pool->current = next;
 
                         if (SMARTALLOCATOR_DIAGNOSTICS)
-                                std::cout << "Allocation of " << actual_bytes << " bytes requested at + " << align_size << " [0x" << pool->current << "], " << reinterpret_cast<char*>(pool->end) - reinterpret_cast<char*>(pool->current) << " bytes remaining" << std::endl;
+                                std::cout << "Allocation: " << actual_bytes << " bytes requested at [0x" << pool->current << ']' << std::endl;
 
                         return address;
                 }
 
-                void deallocate(T* ptr, size_t n)
+                void deallocate(T* address, size_t n)
                 {
-                        // If the memory being returned is outside the boundaries of the pool, assume it's from fallback allocation
-                        if (reinterpret_cast<void*>(ptr) < reinterpret_cast<void*>(pool) ||
-                            reinterpret_cast<void*>(ptr) > pool->end)
+                        // If the address is not inside the block used by the pool, assume it's from the fallback allocatior
+                        if (reinterpret_cast<void*>(address) < reinterpret_cast<void*>(pool) ||
+                            reinterpret_cast<void*>(address) > pool->end)
                         {
                                 if (SMARTALLOCATOR_DIAGNOSTICS)
-                                        std::cout << "Calling deallocate from fallback allocator" << std::endl;
+                                        std::cout << "Deallocate: memory from fallback allocator" << std::endl;
 
-                                fallback.deallocate(ptr, n);
+                                fallback.deallocate(address, n);
                                 return;
                         }
 
-                        // Add the memory to bookkeeping list
-                        Bookkeeper* node = reinterpret_cast<Bookkeeper*>(ptr);
+                        // Otherwise, add the returned memory to bookkeeping
+                        Bookkeeper* node = reinterpret_cast<Bookkeeper*>(address);
                         node->next = pool->bk_first;
                         node->size = n * sizeof(T);
                         pool->bk_first = node;
 
                         if (SMARTALLOCATOR_DIAGNOSTICS)
-                                std::cout << "Deallocation requested, added to bookkeeping " << node->size << " bytes at [0x" << ptr << ']' << std::endl;
+                                std::cout << "Bookkeeping: stored " << node->size << " bytes at [0x" << address << ']' << std::endl;
                 }
 
         };
