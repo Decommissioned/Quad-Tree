@@ -19,13 +19,21 @@ static bool quit = false;
 #include "../src/SmartPoolAllocator.h"
 
 #include <vector>
-std::vector<int> lol;
 
 //////////////////////////////////////////////////////////////////////////
 
-using alloc = orc::SmartPoolAllocator < vec2 > ;
+struct vec_p
+{
+        vec2 position;
 
-orc::QuadTree<alloc>* tree;
+        const vec2& Position() const
+        {
+                return position;
+        }
+};
+
+using alloc = orc::SmartPoolAllocator < vec_p >;
+orc::QuadTree<vec_p, alloc>* tree;
 
 void render()
 {
@@ -51,7 +59,7 @@ int main(int argc, char**argv)
         orc::MemoryPool* pool = orc::MakeMemoryPool(100 * 1024 * 1024);
         alloc a(pool);
 
-        tree = new orc::QuadTree<alloc>(orc::AABB({0.0f, 0.0f}, {400.0f, 300.0f}), a, 3);
+        tree = new orc::QuadTree<vec_p, alloc>(orc::AABB({0.0f, 0.0f}, {1.0f, 1.0f}), a, 5);
 
         SDL_Window* wnd = SDL_CreateWindow("Demo", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, SDL_WINDOW_OPENGL);
         
@@ -65,6 +73,11 @@ int main(int argc, char**argv)
                 {
                         std::cout << (frameID - last) << std::endl;
                         last = frameID;
+
+                        auto aabb = tree->Region();
+                        vec2 tr = aabb.TopRight();
+                        vec2 bl = aabb.BottomLeft();
+                        std::cout << "Region: (" << bl.x << ", " << bl.y << "); (" << tr.x << ", " << tr.y << ')' << std::endl;
 
                         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
                 }
@@ -106,16 +119,20 @@ int main(int argc, char**argv)
                 case SDL_MOUSEBUTTONDOWN:
                         if (e.button.button == 1)
                         {
-                                vec2 point(e.button.x, 599 - e.button.y);
-                                tree->Insert(point);
+                                vec_p item;
+                                item.position.x = e.button.x;
+                                item.position.y = 599 - e.button.y;
+                                tree->Insert(item);
                         }
                         break;
                 }
         }
-
         
         t.join();
         o.join();
+
+        delete tree;
+
         SDL_DestroyWindow(wnd);
 
         return 0;
