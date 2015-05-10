@@ -7,7 +7,6 @@
 #include <memory>
 #include <vector>
 
-// TODO: Outward growth
 // TODO: Remove operations
 // TODO: Optimize
 
@@ -51,7 +50,10 @@ namespace ORC_NAMESPACE
                 static const unsigned char max_depth = 16;
                 const size_t node_capacity;
 
-                enum { NORTHEAST = 3, SOUTHEAST = 2, SOUTHWEST = 0, NORTHWEST = 1 };
+                enum
+                {
+                        NORTHEAST = 3, SOUTHEAST = 2, SOUTHWEST = 0, NORTHWEST = 1
+                };
 
                 struct QuadTreeNode
                 {
@@ -63,7 +65,7 @@ namespace ORC_NAMESPACE
                         size_t capacity;
                         vec2* content;
                 };
-               
+
                 using alloc_t = std::allocator_traits < allocator_type > ;
                 using NodeAlloc = typename alloc_t::template rebind_alloc < QuadTreeNode > ;
                 using VecAlloc = typename alloc_t::template rebind_alloc < vec2 > ;
@@ -73,9 +75,18 @@ namespace ORC_NAMESPACE
 
                 QuadTreeNode root;
 
-                unsigned int partition(const vec2* center, const vec2* point)
+                static unsigned int partition(const vec2* center, const vec2* point)
                 {
                         return ((point->x > center->x) << 1) | (point->y > center->y);
+                }
+
+                static void inc_depth(QuadTreeNode* node)
+                {
+                        node->depth++;
+                        if (node->children != nullptr)
+                        {
+                                for (size_t k = 0; k < 4; ++k) inc_depth(&node->children[k]);
+                        }
                 }
 
                 void insert(QuadTreeNode* node, const vec2* point)
@@ -131,33 +142,82 @@ namespace ORC_NAMESPACE
                                 unsigned int child_index = partition(&center, point);
                                 insert(&parent->children[child_index], point);
                         }
-                        
+
                         // Finally, clean up the parent node
                         vec_alloc.deallocate(parent->content, node_capacity);
                         parent->size = 0;
                         parent->content = nullptr;
                 }
 
-                void expand(vec2 point)
+                void expand(vec2 point) // This is extremely slow, it's best to avoid adding elements outside of the region altogether
                 {
+                        vec2 ne;
+                        vec2 sw;
+
+                        unsigned int target;
+
                         switch (partition(&root.region.Center(), &point))
                         {
                         case SOUTHWEST:
-
+                                ne = root.region.TopRight();
+                                sw = 2.0f * root.region.BottomLeft() - ne;
+                                target = NORTHEAST;
                                 break;
-
                         case SOUTHEAST:
-                                
+                                ne = root.region.TopLeft();
+                                sw = 2.0f * root.region.BottomRight() - ne;
+                                target = NORTHWEST;
                                 break;
-
                         case NORTHEAST:
-
+                                ne = root.region.BottomLeft();
+                                sw = 2.0f * root.region.TopRight() - ne;
+                                target = SOUTHWEST;
                                 break;
-
                         case NORTHWEST:
-
+                                ne = root.region.BottomRight();
+                                sw = 2.0f * root.region.TopLeft() - ne;
+                                target = NORTHEAST;
                                 break;
                         }
+
+                        QuadTreeNode* intermediates = node_alloc.allocate(4, &root.children[target]);
+                        AABB region(ne, sw);
+
+                        for (size_t k = 0; k < 4; ++k)
+                        {
+                                if (k == target)
+                                {
+                                        intermediates[k] = root;
+                                        inc_depth(&intermediates[k]);
+                                }
+                                else
+                                {
+                                        intermediates[k].size = 0;
+                                        intermediates[k].capacity = node_capacity;
+                                        intermediates[k].content = vec_alloc.allocate(node_capacity, &intermediates[k]);
+                                        intermediates[k].children = nullptr;
+                                        
+                                        vec2 pos;
+                                        switch (k)
+                                        {
+                                        case SOUTHWEST: pos = region.BottomLeft(); break;
+                                        case SOUTHEAST: pos = region.BottomRight(); break;
+                                        case NORTHEAST: pos = region.TopRight(); break;
+                                        case NORTHWEST: pos = region.TopLeft(); break;
+                                        }
+
+                                        intermediates[k].region = AABB(pos, region.Center());
+                                }
+
+                                intermediates[k].parent = &root;
+                                intermediates[k].depth = root.depth + 1;
+                        }
+
+                        if (root.size > 0) vec_alloc.deallocate(root.content, root.size);
+                        root.size = 0;
+                        root.capacity = 0;
+                        root.region = region;
+                        root.children = intermediates;
                 }
 
                 void query(std::vector<vec2>& vec, const AABB& region, const QuadTreeNode* node) const
@@ -211,7 +271,7 @@ namespace ORC_NAMESPACE
                                         if (x >= 0 && x < 800 && y >= 0 && y < 600)
                                         {
                                                 buffer[y * 800 + (x - 1)] = 0xFFFFFFFF;
-                                                buffer[y * 800 + (x    )] = 0xFFFFFFFF;
+                                                buffer[y * 800 + (x)] = 0xFFFFFFFF;
                                                 buffer[y * 800 + (x + 1)] = 0xFFFFFFFF;
                                                 buffer[(y - 1) * 800 + x] = 0xFFFFFFFF;
                                                 buffer[(y + 1) * 800 + x] = 0xFFFFFFFF;
@@ -254,6 +314,9 @@ namespace ORC_NAMESPACE
 
                 void Insert(const vec2& point)
                 {
+                        while (!root.region.Inside(point))
+                                expand(point);
+
                         insert(&root, &point);
                 }
 
@@ -268,6 +331,11 @@ namespace ORC_NAMESPACE
                 void Render(unsigned int* buffer) const
                 {
                         render(buffer, &root);
+                }
+
+                const AABB& Region() const
+                {
+                        return root.region;
                 }
 
         };
