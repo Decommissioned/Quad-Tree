@@ -7,9 +7,11 @@
 #include <allocators>
 #include <vector>
 
+// TODO: Make better methods
 // TODO: Remove operations
 // TODO: Moving operations
-// TODO: Optimize
+// TOOD: Test and profile
+// TODO: Optimize -- remove recursions
 
 #pragma inline_recursion(on)
 #pragma inline_depth(16)
@@ -67,31 +69,35 @@ namespace ORC_NAMESPACE
 
                 void insert(QuadTreeNode* node, const type_p* point)
                 {
-                        if (node->children != nullptr) // internal node, descend
-                        {
-                                unsigned int child_index = partition(node->region.Center(), point->Position());
-                                insert(&node->children[child_index], point);
-                        }
-                        else // leaf node, insert here
-                        {
-                                if (node->content == nullptr) // requires memory allocation
-                                        node->content = vec_alloc.allocate(node->capacity, node);
+                        if (node->content == nullptr) // requires memory allocation
+                                node->content = vec_alloc.allocate(node->capacity, node);
 
-                                node->content[node->size] = *point;
-                                node->size = node->size + 1;
-                                if (node->size == node->capacity) // partitioning or reallocation required
+                        node->content[node->size] = *point;
+                        node->size = node->size + 1;
+                        if (node->size == node->capacity) // partitioning or reallocation required
+                        {
+                                if (node->depth < max_depth) buy(node);
+                                else // if maximum depth has been reached, simply reallocate memory for the node
                                 {
-                                        if (node->depth < max_depth) buy(node);
-                                        else // if maximum depth has been reached, simply reallocate memory for the node
-                                        {
-                                                node->capacity += node_capacity;
-                                                type_p* new_content = vec_alloc.allocate(node->capacity, node);
-                                                std::memcpy(new_content, node->content, sizeof(type_p) * node->size);
-                                                vec_alloc.deallocate(node->content, node->size);
-                                                node->content = new_content;
-                                        }
+                                        node->capacity += node_capacity;
+                                        type_p* new_content = vec_alloc.allocate(node->capacity, node);
+                                        std::memcpy(new_content, node->content, sizeof(type_p) * node->size);
+                                        vec_alloc.deallocate(node->content, node->size);
+                                        node->content = new_content;
                                 }
                         }
+
+                }
+
+                void remove(QuadTreeNode* node, type_p* point)
+                {
+                        bool found = false;
+                        for (size_t k = 0; k < node->size; ++k)
+                        {
+                                node->content[k - found] = node->content[k];
+                                if (&node->content[k] == point) found = true;
+                        }
+                        if (found) --node->size;
                 }
 
                 void buy(QuadTreeNode* parent)
@@ -172,7 +178,7 @@ namespace ORC_NAMESPACE
                                         intermediates[k].capacity = node_capacity;
                                         intermediates[k].content = vec_alloc.allocate(node_capacity, &intermediates[k]);
                                         intermediates[k].children = nullptr;
-                                        
+
                                         vec2 pos;
                                         switch (k)
                                         {
@@ -267,7 +273,16 @@ namespace ORC_NAMESPACE
                         while (!root.region.Inside(item.Position()))
                                 expand(item.Position());
 
-                        insert(&root, &item);
+                        // Navigate to insertion region
+                        QuadTreeNode* current = &root;
+                        while (current->children != nullptr)
+                        {
+                                unsigned int index = partition(current->region.Center(), item.Position());
+                                current = &current->children[index];
+                        }
+
+                        // Perform the operation
+                        insert(current, &item);
                 }
 
                 template <typename alloc = std::allocator<type_p*>>
@@ -279,6 +294,59 @@ namespace ORC_NAMESPACE
                                 query(results, region, &root);
 
                         return results;
+                }
+
+                void Remove(type_p* element)
+                {
+                        QuadTreeNode* current = &root;
+                        while (current->children != nullptr)
+                        {
+                                unsigned int index = partition(current->region.Center(), element->Position());
+                                current = current->children[index];
+                        }
+                        remove(current, element);
+                }
+
+                void Move(type_p* element, const vec2& to)
+                {
+                        QuadTreeNode* source = &root;
+                        QuadTreeNode* destination;
+
+                        // Go to the point
+                        while (source->children != nullptr)
+                        {
+                                unsigned int index = partition(source->region.Center(), element->Position());
+                                source = &source->children[index];
+                        }
+
+                        // Move back up until it's in range
+                        destination = source;
+                        while (!destination->region.Inside(to))
+                        {
+                                if (destination->parent == nullptr)
+                                        expand(to);
+
+                                destination = &destination->parent;
+                        }
+
+                        // If it's inside the same region, just update its position
+                        if (destination == source)
+                        {
+                                element->Position(to);
+                                return;
+                        }
+
+                        // Now go to the destination
+                        while (destination->children != nullptr)
+                        {
+                                unsigned int index = partition(destination->region.Center(), to);
+                                destination = &destination->children[index];
+                        }
+
+                        // Update its position, remove from source and insert in destination
+                        element->Position(to);
+                        insert(destination, element);
+                        remove(source, element);
                 }
 
                 const AABB& Region() const
