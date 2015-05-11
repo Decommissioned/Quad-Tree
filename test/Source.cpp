@@ -32,6 +32,11 @@ struct vec_p
         {
                 return position;
         }
+
+        void Position(const vec2& pos)
+        {
+                position = pos;
+        }
 };
 
 using alloc = orc::SmartPoolAllocator < vec_p >;
