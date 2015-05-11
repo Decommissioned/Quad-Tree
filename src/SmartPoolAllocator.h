@@ -5,7 +5,7 @@
 #include <memory>
 #include <iostream>
 
-#define SMARTALLOCATOR_DIAGNOSTICS 1
+#define SMARTALLOCATOR_DIAGNOSTICS 0
 
 namespace ORC_NAMESPACE
 {
