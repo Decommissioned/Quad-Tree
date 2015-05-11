@@ -104,4 +104,19 @@ namespace ORC_NAMESPACE
                 return (ne + sw) * 0.5f;
         }
 
+
+        void util::Render(const vec2& point, unsigned int* buffer, unsigned int color)
+        {
+                int x = (int) ceilf(point.x);
+                int y = (int) ceilf(point.y);
+                if (x >= 0 && x < 800 && y >= 0 && y < 600)
+                {
+                        buffer[y * 800 + (x - 1)] = color;
+                        buffer[y * 800 + (x)]     = color;
+                        buffer[y * 800 + (x + 1)] = color;
+                        buffer[(y - 1) * 800 + x] = color;
+                        buffer[(y + 1) * 800 + x] = color;
+                }
+        }
+
 };

@@ -15,7 +15,7 @@ int my;
 
 static bool quit = false;
 
-#define SMART_ALLOCATOR_DIAGNOSTICS
+// #define SMART_ALLOCATOR_DIAGNOSTICS
 
 #include "../src/QuadTreeRenderer.h"
 #include "../src/SmartPoolAllocator.h"
@@ -38,37 +38,43 @@ using alloc = orc::SmartPoolAllocator < vec_p >;
 orc::QuadTreeRenderer<vec_p, alloc>* tree;
 
 int depth = -1;
+bool insert = true;
 
 void render()
 {
-        orc::AABB ms(vec2(mx - 5, my - 5), vec2(mx + 5, my + 5));
-        ms.Render(backbuffer, 0xFFFF0000);
-
-
+        const int width = 49;
+        orc::AABB ms(vec2(mx - width, my - width), vec2(mx + width, my + width));
+        ms.Render(backbuffer, 0xFFFFFFFF);
 
         tree->Render(backbuffer, depth);
+
+        auto points = tree->Query(ms);
+        for (auto ptr : points)
+        {
+                orc::util::Render(ptr->Position(), backbuffer, 0xFF0000FF);
+        }
+
 
         backbuffer[400 * 800 + 350] = 0xFF0000FF;
 }
 
 int main(int argc, char**argv)
 {
-        /*const int spacing = 50;
+        orc::MemoryPool* pool = orc::MakeMemoryPool(100 * 1024 * 1024);
+        alloc a(pool);
+        tree = new orc::QuadTreeRenderer<vec_p, alloc>(orc::AABB({0.0f, 0.0f}, {800.0f, 600.0f}), a);
+
+        const int spacing = 50;
         for (int x = 1; x < (800 - spacing); x+=spacing)
         {
                 for (int y = 1; y < (600 - spacing); y+= spacing)
                 {
-                        tree->Insert({x, y});
+                        tree->Insert(vec_p {vec2{x, y}});
                 }
-        }*/
-
-        orc::MemoryPool* pool = orc::MakeMemoryPool(100 * 1024 * 1024);
-        alloc a(pool);
-
-        tree = new orc::QuadTreeRenderer<vec_p, alloc>(orc::AABB({390.0f, 290.0f}, {410.0f, 310.0f}), a);
+        }
 
         SDL_Window* wnd = SDL_CreateWindow("Demo", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, SDL_WINDOW_OPENGL);
-        
+
         unsigned int frameID = 0;
 
         std::thread o([&]() {
@@ -125,10 +131,17 @@ int main(int argc, char**argv)
                 case SDL_MOUSEBUTTONDOWN:
                         if (e.button.button == 1)
                         {
-                                vec_p item;
-                                item.position.x = e.button.x;
-                                item.position.y = 599 - e.button.y;
-                                tree->Insert(item);
+                                if (insert)
+                                {
+                                        vec_p item;
+                                        item.position.x = e.button.x;
+                                        item.position.y = 599 - e.button.y;
+                                        tree->Insert(item);
+                                }
+                        }
+                        else if (e.button.button == 3)
+                        {
+                                insert = !insert;
                         }
                 case SDL_KEYDOWN:
                         if (e.key.keysym.sym == 'a' && depth > -1) depth--;

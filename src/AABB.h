@@ -33,6 +33,11 @@ namespace ORC_NAMESPACE
 
         };
 
+        namespace util
+        {
+                void Render(const vec2& point, unsigned int* buffer, unsigned int color);
+        }
+
 };
 
 #endif // _AABB_H

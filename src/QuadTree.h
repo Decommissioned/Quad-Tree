@@ -4,10 +4,11 @@
 #include "config.h"
 #include "AABB.h"
 
-#include <memory>
+#include <allocators>
 #include <vector>
 
 // TODO: Remove operations
+// TODO: Moving operations
 // TODO: Optimize
 
 #pragma inline_recursion(on)
@@ -25,7 +26,7 @@ namespace ORC_NAMESPACE
                 static const unsigned char max_depth = 16;
                 const size_t node_capacity;
 
-                enum
+                enum GeoRegion
                 {
                         NORTHEAST = 3, SOUTHEAST = 2, SOUTHWEST = 0, NORTHWEST = 1
                 };
@@ -128,7 +129,6 @@ namespace ORC_NAMESPACE
 
                 void expand(vec2 point) // This is extremely slow, it's best to avoid adding elements outside of the region altogether
                 {
-                        // TODO: there might be a bug here
                         vec2 ne, sw;
                         unsigned int target;
 
@@ -195,7 +195,7 @@ namespace ORC_NAMESPACE
                         root.children = intermediates;
                 }
 
-                template <typename alloc = std::allocator>
+                template <typename alloc = std::allocator<type_p*>>
                 void query(std::vector<type_p*>& results, const AABB& region, const QuadTreeNode* node) const
                 {
                         if (node->children != nullptr) // internal node, descend
@@ -270,7 +270,7 @@ namespace ORC_NAMESPACE
                         insert(&root, &item);
                 }
 
-                template <typename alloc = std::allocator>
+                template <typename alloc = std::allocator<type_p*>>
                 std::vector<type_p*, alloc> Query(const AABB& region) const
                 {
                         std::vector<type_p*> results;
