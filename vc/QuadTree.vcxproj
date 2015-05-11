@@ -69,6 +69,7 @@
     <ClInclude Include="..\src\AABB.h" />
     <ClInclude Include="..\src\config.h" />
     <ClInclude Include="..\src\QuadTree.h" />
+    <ClInclude Include="..\src\QuadTreeRenderer.h" />
     <ClInclude Include="..\src\SmartPoolAllocator.h" />
   </ItemGroup>
   <ItemGroup>
