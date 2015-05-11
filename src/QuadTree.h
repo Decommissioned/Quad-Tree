@@ -98,8 +98,11 @@ namespace ORC_NAMESPACE
                                 unsigned int child_index = partition(node->region.Center(), point->Position());
                                 insert(&node->children[child_index], point);
                         }
-                        else // leaf node
+                        else // leaf node, insert here
                         {
+                                if (node->content == nullptr) // requires memory allocation
+                                        node->content = vec_alloc.allocate(node->capacity, node);
+
                                 node->content[node->size] = *point;
                                 node->size = node->size + 1;
                                 if (node->size == node->capacity) // partitioning or reallocation required
@@ -126,7 +129,7 @@ namespace ORC_NAMESPACE
                                 parent->children[k].parent = parent;
                                 parent->children[k].children = nullptr;
                                 parent->children[k].size = 0;
-                                parent->children[k].content = vec_alloc.allocate(node_capacity, &parent->children[k]);
+                                parent->children[k].content = nullptr;
                                 parent->children[k].depth = parent->depth + 1;
                                 parent->children[k].capacity = node_capacity;
                         }
