@@ -35,14 +35,18 @@ struct vec_p
 using alloc = orc::SmartPoolAllocator < vec_p >;
 orc::QuadTree<vec_p, alloc>* tree;
 
+int depth = -1;
+
 void render()
 {
         orc::AABB ms(vec2(mx - 5, my - 5), vec2(mx + 5, my + 5));
-        ms.Render(backbuffer, 0xFFFF00FF);
+        ms.Render(backbuffer, 0xFFFF0000);
 
 
 
-        tree->Render(backbuffer);
+        tree->Render(backbuffer, depth);
+
+        backbuffer[400 * 800 + 350] = 0xFF0000FF;
 }
 
 int main(int argc, char**argv)
@@ -59,7 +63,7 @@ int main(int argc, char**argv)
         orc::MemoryPool* pool = orc::MakeMemoryPool(100 * 1024 * 1024);
         alloc a(pool);
 
-        tree = new orc::QuadTree<vec_p, alloc>(orc::AABB({0.0f, 0.0f}, {1.0f, 1.0f}), a, 5);
+        tree = new orc::QuadTree<vec_p, alloc>(orc::AABB({390.0f, 290.0f}, {410.0f, 310.0f}), a, 5);
 
         SDL_Window* wnd = SDL_CreateWindow("Demo", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, SDL_WINDOW_OPENGL);
         
@@ -77,7 +81,7 @@ int main(int argc, char**argv)
                         auto aabb = tree->Region();
                         vec2 tr = aabb.TopRight();
                         vec2 bl = aabb.BottomLeft();
-                        std::cout << "Region: (" << bl.x << ", " << bl.y << "); (" << tr.x << ", " << tr.y << ')' << std::endl;
+                        std::cout << "Region: (" << bl.x << ", " << bl.y << "); (" << tr.x << ", " << tr.y << ") Depth = " << depth << std::endl;
 
                         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
                 }
@@ -124,6 +128,9 @@ int main(int argc, char**argv)
                                 item.position.y = 599 - e.button.y;
                                 tree->Insert(item);
                         }
+                case SDL_KEYDOWN:
+                        if (e.key.keysym.sym == 'a' && depth > -1) depth--;
+                        if (e.key.keysym.sym == 'b') depth++;
                         break;
                 }
         }
