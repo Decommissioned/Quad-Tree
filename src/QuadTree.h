@@ -44,8 +44,10 @@ namespace ORC_NAMESPACE
 {
 
         template <typename type_p, typename allocator_type = std::allocator<type_p>>
-        class QuadTree final
+        class QuadTree
         {
+
+        protected:
 
                 static const unsigned char max_depth = 16;
                 const size_t node_capacity;
@@ -150,6 +152,7 @@ namespace ORC_NAMESPACE
 
                 void expand(vec2 point) // This is extremely slow, it's best to avoid adding elements outside of the region altogether
                 {
+                        // TODO: there might be a bug here
                         vec2 ne, sw;
                         unsigned int target;
 
@@ -173,7 +176,7 @@ namespace ORC_NAMESPACE
                         case NORTHWEST:
                                 ne = root.region.BottomRight();
                                 sw = 2.0f * root.region.TopLeft() - ne;
-                                target = NORTHEAST;
+                                target = SOUTHEAST;
                                 break;
                         }
 
@@ -199,8 +202,8 @@ namespace ORC_NAMESPACE
                                         {
                                         case SOUTHWEST: pos = region.BottomLeft(); break;
                                         case SOUTHEAST: pos = region.BottomRight(); break;
-                                        case NORTHEAST: pos = region.TopRight(); break;
                                         case NORTHWEST: pos = region.TopLeft(); break;
+                                        case NORTHEAST: pos = region.TopRight(); break;
                                         }
                                         intermediates[k].region = AABB(pos, region.Center());
                                 }
@@ -216,6 +219,7 @@ namespace ORC_NAMESPACE
                         root.children = intermediates;
                 }
 
+                template <typename alloc = std::allocator>
                 void query(std::vector<type_p*>& results, const AABB& region, const QuadTreeNode* node) const
                 {
                         if (node->children != nullptr) // internal node, descend
@@ -251,11 +255,11 @@ namespace ORC_NAMESPACE
                         }
                 }
 
-                void render(unsigned int* buffer, const QuadTreeNode* node) const
+                void render(unsigned int* buffer, const QuadTreeNode* node, int depth) const
                 {
                         if (node->children != nullptr) // internal node
                         {
-                                for (size_t k = 0; k < 4; ++k) render(buffer, &node->children[k]);
+                                for (size_t k = 0; k < 4; ++k) render(buffer, &node->children[k], depth);
                         }
                         else // leaf node
                         {
@@ -267,14 +271,15 @@ namespace ORC_NAMESPACE
                                         if (x >= 0 && x < 800 && y >= 0 && y < 600)
                                         {
                                                 buffer[y * 800 + (x - 1)] = 0xFFFFFFFF;
-                                                buffer[y * 800 + (x)] = 0xFFFFFFFF;
+                                                buffer[y * 800 + (x)    ] = 0xFFFFFFFF;
                                                 buffer[y * 800 + (x + 1)] = 0xFFFFFFFF;
                                                 buffer[(y - 1) * 800 + x] = 0xFFFFFFFF;
                                                 buffer[(y + 1) * 800 + x] = 0xFFFFFFFF;
                                         }
                                 }
                         }
-                        node->region.Render(buffer, COLOR_TABLE[node->depth]);
+                        if (depth == -1 || node->depth == depth)
+                                node->region.Render(buffer, COLOR_TABLE[node->depth]);
                 }
 
                 void init_root(const AABB& region)
@@ -303,7 +308,7 @@ namespace ORC_NAMESPACE
                         init_root(region);
                 }
 
-                ~QuadTree()
+                virtual ~QuadTree()
                 {
                         free(&root);
                 }
@@ -316,7 +321,8 @@ namespace ORC_NAMESPACE
                         insert(&root, &item);
                 }
 
-                std::vector<type_p*> Query(const AABB& region) const
+                template <typename alloc = std::allocator>
+                std::vector<type_p*, alloc> Query(const AABB& region) const
                 {
                         std::vector<type_p*> results;
 
@@ -326,9 +332,9 @@ namespace ORC_NAMESPACE
                         return results;
                 }
 
-                void Render(unsigned int* buffer) const
+                void Render(unsigned int* buffer, int depth) const
                 {
-                        render(buffer, &root);
+                        render(buffer, &root, depth);
                 }
 
                 const AABB& Region() const
