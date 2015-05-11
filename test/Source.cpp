@@ -15,6 +15,8 @@ int my;
 
 static bool quit = false;
 
+#define SMART_ALLOCATOR_DIAGNOSTICS
+
 #include "../src/QuadTree.h"
 #include "../src/SmartPoolAllocator.h"
 
