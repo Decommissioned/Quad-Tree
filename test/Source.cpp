@@ -17,7 +17,7 @@ static bool quit = false;
 
 #define SMART_ALLOCATOR_DIAGNOSTICS
 
-#include "../src/QuadTree.h"
+#include "../src/QuadTreeRenderer.h"
 #include "../src/SmartPoolAllocator.h"
 
 #include <vector>
@@ -35,7 +35,7 @@ struct vec_p
 };
 
 using alloc = orc::SmartPoolAllocator < vec_p >;
-orc::QuadTree<vec_p, alloc>* tree;
+orc::QuadTreeRenderer<vec_p, alloc>* tree;
 
 int depth = -1;
 
@@ -65,7 +65,7 @@ int main(int argc, char**argv)
         orc::MemoryPool* pool = orc::MakeMemoryPool(100 * 1024 * 1024);
         alloc a(pool);
 
-        tree = new orc::QuadTree<vec_p, alloc>(orc::AABB({390.0f, 290.0f}, {410.0f, 310.0f}), a, 5);
+        tree = new orc::QuadTreeRenderer<vec_p, alloc>(orc::AABB({390.0f, 290.0f}, {410.0f, 310.0f}), a);
 
         SDL_Window* wnd = SDL_CreateWindow("Demo", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, SDL_WINDOW_OPENGL);
         
