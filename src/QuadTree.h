@@ -8,10 +8,9 @@
 #include <vector>
 
 // TODO: Make better methods
-// TODO: Remove operations
-// TODO: Moving operations
 // TOOD: Test and profile
-// TODO: Optimize -- remove recursions
+// TODO: Optimize -- remove recursions -- started
+// TODO: Test remove functionality
 
 #pragma inline_recursion(on)
 #pragma inline_depth(16)
@@ -58,6 +57,24 @@ namespace ORC_NAMESPACE
                         return ((point.x > center.x) << 1) | (point.y > center.y);
                 }
 
+                // Expansion heuristic: only expand if at least half of the elements will change sub quadrant
+                bool should_expand(QuadTreeNode* node)
+                {
+                        unsigned int counter[4] = {0, 0, 0, 0};
+                        vec2 center = node->region.Center();
+                        for (size_t k = 0; k < node->size; ++k)
+                        {
+                                unsigned int index = partition(center, node->content[k].Position());
+                                ++counter[index];
+                        }
+                        size_t half_size = node->size / 2;
+                        for (size_t k = 0; k < 4; ++k)
+                        {
+                                if (counter[k] >= half_size) return true;
+                        }
+                        return false;
+                }
+
                 static void inc_depth(QuadTreeNode* node)
                 {
                         node->depth++;
@@ -67,17 +84,15 @@ namespace ORC_NAMESPACE
                         }
                 }
 
-                void insert(QuadTreeNode* node, const type_p* point)
+                type_p* insert(QuadTreeNode* node, const type_p* point)
                 {
-                        if (node->content == nullptr) // requires memory allocation
-                                node->content = vec_alloc.allocate(node->capacity, node);
-
                         node->content[node->size] = *point;
+                        type_p* element = &node->content[node->size];
                         node->size = node->size + 1;
                         if (node->size == node->capacity) // partitioning or reallocation required
                         {
-                                if (node->depth < max_depth) buy(node);
-                                else // if maximum depth has been reached, simply reallocate memory for the node
+                                if (node->depth < max_depth && should_expand(node)) buy(node);
+                                else // Simply allocate more memory for the region
                                 {
                                         node->capacity += node_capacity;
                                         type_p* new_content = vec_alloc.allocate(node->capacity, node);
@@ -86,7 +101,7 @@ namespace ORC_NAMESPACE
                                         node->content = new_content;
                                 }
                         }
-
+                        return element;
                 }
 
                 void remove(QuadTreeNode* node, type_p* point)
@@ -109,7 +124,7 @@ namespace ORC_NAMESPACE
                                 parent->children[k].parent = parent;
                                 parent->children[k].children = nullptr;
                                 parent->children[k].size = 0;
-                                parent->children[k].content = nullptr;
+                                parent->children[k].content = vec_alloc.allocate(node_capacity, &parent->children[k]);
                                 parent->children[k].depth = parent->depth + 1;
                                 parent->children[k].capacity = node_capacity;
                         }
@@ -131,6 +146,24 @@ namespace ORC_NAMESPACE
                         vec_alloc.deallocate(parent->content, node_capacity);
                         parent->size = 0;
                         parent->content = nullptr;
+                }
+
+                static void ascend(QuadTreeNode*& node, vec2 point)
+                {
+                        while (node->parent != nullptr)
+                        {
+                                if (node->region.Inside(point)) return;
+                                node = node->parent;
+                        }
+                }
+
+                static void descend(QuadTreeNode*& node, vec2 point)
+                {
+                        while (node->children != nullptr)
+                        {
+                                unsigned int index = partition(node->region.Center(), point);
+                                node = &node->children[index];
+                        }
                 }
 
                 void expand(vec2 point) // This is extremely slow, it's best to avoid adding elements outside of the region altogether
@@ -268,21 +301,18 @@ namespace ORC_NAMESPACE
                         free(&root);
                 }
 
-                void Insert(const type_p& item)
+                type_p* Insert(const type_p& item)
                 {
+                        // If inserting outside of the region expansion is required
                         while (!root.region.Inside(item.Position()))
                                 expand(item.Position());
 
-                        // Navigate to insertion region
+                        // Descend to the appropriate leaf
                         QuadTreeNode* current = &root;
-                        while (current->children != nullptr)
-                        {
-                                unsigned int index = partition(current->region.Center(), item.Position());
-                                current = &current->children[index];
-                        }
+                        descend(current, item.Position());
 
                         // Perform the operation
-                        insert(current, &item);
+                        return insert(current, &item);
                 }
 
                 template <typename alloc = std::allocator<type_p*>>
@@ -299,54 +329,37 @@ namespace ORC_NAMESPACE
                 void Remove(type_p* element)
                 {
                         QuadTreeNode* current = &root;
-                        while (current->children != nullptr)
-                        {
-                                unsigned int index = partition(current->region.Center(), element->Position());
-                                current = current->children[index];
-                        }
+                        descend(current, item.Position());
                         remove(current, element);
                 }
 
-                void Move(type_p* element, const vec2& to)
+                type_p* Move(type_p* element, const vec2& to)
                 {
                         QuadTreeNode* source = &root;
                         QuadTreeNode* destination;
 
                         // Go to the point
-                        while (source->children != nullptr)
-                        {
-                                unsigned int index = partition(source->region.Center(), element->Position());
-                                source = &source->children[index];
-                        }
+                        descend(source, element->Position());
 
                         // Move back up until it's in range
                         destination = source;
-                        while (!destination->region.Inside(to))
-                        {
-                                if (destination->parent == nullptr)
-                                        expand(to);
-
-                                destination = &destination->parent;
-                        }
+                        ascend(destination, to);
 
                         // If it's inside the same region, just update its position
                         if (destination == source)
                         {
                                 element->Position(to);
-                                return;
+                                return element;
                         }
 
-                        // Now go to the destination
-                        while (destination->children != nullptr)
-                        {
-                                unsigned int index = partition(destination->region.Center(), to);
-                                destination = &destination->children[index];
-                        }
+                        // Go to the leaf node containing the destination point
+                        descend(destination, to);
 
                         // Update its position, remove from source and insert in destination
                         element->Position(to);
-                        insert(destination, element);
+                        type_p* new_element = insert(destination, element);
                         remove(source, element);
+                        return new_element;
                 }
 
                 const AABB& Region() const
