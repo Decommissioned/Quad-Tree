@@ -4,7 +4,6 @@
 #include "QuadTree.h"
 
 // TODO: overhaul this class for configurable widths and height
-// TODO: friend a QuadTree might be a better approach to this
 
 namespace ORC_NAMESPACE
 {
@@ -20,6 +19,11 @@ namespace ORC_NAMESPACE
                         }
                         else // leaf node
                         {
+                                if (depth == -2)
+                                {
+                                        node->region.Render(buffer, node->depth < count ? table[node->depth] : table[count - 1]);
+                                        return;
+                                }
                                 for (size_t k = 0; k < node->size; ++k)
                                 {
                                         vec2 point = node->content[k].Position();
@@ -38,6 +42,9 @@ namespace ORC_NAMESPACE
                 explicit QuadTreeRenderer(const AABB& region, allocator_type& allocator) : QuadTree(region, allocator, 10U)
                 {}
 
+                explicit QuadTreeRenderer(const AABB& region, allocator_type& allocator, unsigned int node_capacity) : QuadTree(region, allocator, node_capacity)
+                {}
+
                 void Render(unsigned int* buffer, int depth, const unsigned int* table, unsigned int count) const
                 {
                         render(buffer, &root, depth, table, count);
@@ -53,6 +60,11 @@ namespace ORC_NAMESPACE
                                 0xFF0000FF, 0xFF00FF00, 0xFFFF0000, 0xFF007FFF
                         };
                         render(buffer, &root, depth, COLOR_TABLE, 16);
+                }
+
+                void Render(unsigned int* buffer) const
+                {
+                        Render(buffer, -2);
                 }
         };
 
