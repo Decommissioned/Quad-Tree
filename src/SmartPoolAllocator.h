@@ -5,12 +5,6 @@
 #include <memory>
 #include <iostream>
 
-#ifdef SMART_ALLOCATOR_DIAGNOSTICS
-#define SMART_ALLOCATOR_ENABLE_PRINT 1
-#else
-#define SMART_ALLOCATOR_ENABLE_PRINT 0
-#endif
-
 namespace ORC_NAMESPACE
 {
         /*
@@ -105,8 +99,9 @@ namespace ORC_NAMESPACE
                                 {
                                         if (node->size >= actual_bytes) // Does it fit? Alignment checks not needed here, it's already aligned
                                         {
-                                                if (SMART_ALLOCATOR_ENABLE_PRINT)
+#ifdef SMART_ALLOCATOR_DIAGNOSTICS
                                                         std::cout << "Bookkeeping: claimed " << node->size << " bytes at [0x" << node << ']' << std::endl;
+#endif
 
                                                 // Make the previous node point to the next node
                                                 if (prev != nullptr) prev->next = node->next;
@@ -121,28 +116,31 @@ namespace ORC_NAMESPACE
                                 }
 
                                 // No room to perform allocation, use fallback allocator
-                                if (SMART_ALLOCATOR_ENABLE_PRINT)
+#ifdef SMART_ALLOCATOR_DIAGNOSTICS
                                         std::cout << "Allocation: no memory, using fallback allocator" << std::endl;
+#endif
 
                                 return fallback.allocate(size);
                         }
 
                         pool->current = next;
 
-                        if (SMART_ALLOCATOR_ENABLE_PRINT)
+#ifdef SMART_ALLOCATOR_DIAGNOSTICS
                                 std::cout << "Allocation: " << actual_bytes << " bytes requested at [0x" << pool->current << ']' << std::endl;
+#endif
 
                         return address;
                 }
 
                 void deallocate(T* address, size_t n)
                 {
-                        // If the address is not inside the block used by the pool, assume it's from the fallback allocatior
+                        // If the address is not inside the block used by the pool, assume it's from the fallback allocator
                         if (reinterpret_cast<void*>(address) < reinterpret_cast<void*>(pool) ||
                             reinterpret_cast<void*>(address) > pool->end)
                         {
-                                if (SMART_ALLOCATOR_ENABLE_PRINT)
+#ifdef SMART_ALLOCATOR_DIAGNOSTICS
                                         std::cout << "Deallocate: memory from fallback allocator" << std::endl;
+#endif
 
                                 fallback.deallocate(address, n);
                                 return;
@@ -151,11 +149,12 @@ namespace ORC_NAMESPACE
                         // Otherwise, add the returned memory to bookkeeping
                         Bookkeeper* node = reinterpret_cast<Bookkeeper*>(address);
                         node->next = pool->bk_first;
-                        node->size = n * sizeof(T);
+                        node->size = (n * sizeof(T)) > sizeof(Bookkeeper) ? (n * sizeof(T)) : sizeof(Bookkeeper);
                         pool->bk_first = node;
 
-                        if (SMART_ALLOCATOR_ENABLE_PRINT)
+#ifdef SMART_ALLOCATOR_DIAGNOSTICS
                                 std::cout << "Bookkeeping: stored " << node->size << " bytes at [0x" << address << ']' << std::endl;
+#endif
                 }
 
         };
