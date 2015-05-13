@@ -67,10 +67,10 @@ namespace ORC_NAMESPACE
                                 unsigned int index = partition(center, node->content[k].Position());
                                 ++counter[index];
                         }
-                        size_t half_size = node->size / 2;
+                        const size_t half_capacity = node_capacity / 2;
                         for (size_t k = 0; k < 4; ++k)
                         {
-                                if (counter[k] >= half_size) return true;
+                                if (counter[k] >= half_capacity) return true;
                         }
                         return false;
                 }
@@ -89,9 +89,9 @@ namespace ORC_NAMESPACE
                         node->content[node->size] = *point;
                         type_p* element = &node->content[node->size];
                         node->size = node->size + 1;
-                        if (node->size == node->capacity) // partitioning or reallocation required
+                        if (node->size >= node->capacity) // partitioning or reallocation may be required
                         {
-                                if (node->depth < max_depth && should_expand(node)) buy(node);
+                                if ((node->depth < max_depth) && should_expand(node)) buy(node);
                                 else // Simply allocate more memory for the region
                                 {
                                         node->capacity += node_capacity;

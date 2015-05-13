@@ -139,6 +139,10 @@ int main(int argc, char**argv)
                 case SDL_MOUSEMOTION:
                         mx = e.motion.x;
                         my = 599 - e.motion.y;
+
+                        X = mx;
+                        Y = my;
+
                         break;
                 case SDL_MOUSEBUTTONDOWN:
                         if (e.button.button == 1)
@@ -156,10 +160,6 @@ int main(int argc, char**argv)
                                 insert = !insert;
                         }
                 case SDL_KEYDOWN:
-                        if (e.key.keysym.sym == 'w') Y++;
-                        if (e.key.keysym.sym == 'a') X--;
-                        if (e.key.keysym.sym == 's') Y--;
-                        if (e.key.keysym.sym == 'd') X++;
                         break;
                 }
         }

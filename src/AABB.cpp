@@ -109,7 +109,7 @@ namespace ORC_NAMESPACE
         {
                 int x = (int) ceilf(point.x);
                 int y = (int) ceilf(point.y);
-                if (x >= 0 && x < 800 && y >= 0 && y < 600)
+                if (x >= 1 && x < 799 && y >= 1 && y < 599)
                 {
                         buffer[y * 800 + (x - 1)] = color;
                         buffer[y * 800 + (x)]     = color;
