@@ -39,11 +39,15 @@ struct vec_p
         }
 };
 
+float X = 300.0f;
+float Y = 300.0f;
+
 using alloc = orc::SmartPoolAllocator < vec_p >;
 orc::QuadTreeRenderer<vec_p, alloc>* tree;
 
-int depth = -1;
 bool insert = true;
+
+vec_p* mov;
 
 void render()
 {
@@ -51,7 +55,7 @@ void render()
         orc::AABB ms(vec2(mx - width, my - width), vec2(mx + width, my + width));
         ms.Render(backbuffer, 0xFFFFFFFF);
 
-        tree->Render(backbuffer, depth);
+        tree->Render(backbuffer);
 
         auto points = tree->Query(ms);
         for (auto ptr : points)
@@ -59,24 +63,27 @@ void render()
                 orc::util::Render(ptr->Position(), backbuffer, 0xFF0000FF);
         }
 
+        mov = tree->Move(mov, {X, Y});
+        orc::util::Render(mov->Position(), backbuffer, 0xFF00FF00);
 
-        backbuffer[400 * 800 + 350] = 0xFF0000FF;
 }
 
 int main(int argc, char**argv)
 {
         orc::MemoryPool* pool = orc::MakeMemoryPool(100 * 1024 * 1024);
         alloc a(pool);
-        tree = new orc::QuadTreeRenderer<vec_p, alloc>(orc::AABB({0.0f, 0.0f}, {800.0f, 600.0f}), a);
+        tree = new orc::QuadTreeRenderer<vec_p, alloc>(orc::AABB({0.0f, 0.0f}, {800.0f, 600.0f}), a, 10U);
 
-        const int spacing = 50;
+        const int spacing = 25;
         for (int x = 1; x < (800 - spacing); x+=spacing)
         {
                 for (int y = 1; y < (600 - spacing); y+= spacing)
                 {
-                        tree->Insert(vec_p {vec2{x, y}});
+                        tree->Insert(vec_p {vec2 {x, y}});
                 }
         }
+
+        mov = tree->Insert({{X, Y}});
 
         SDL_Window* wnd = SDL_CreateWindow("Demo", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, SDL_WINDOW_OPENGL);
 
@@ -94,7 +101,7 @@ int main(int argc, char**argv)
                         auto aabb = tree->Region();
                         vec2 tr = aabb.TopRight();
                         vec2 bl = aabb.BottomLeft();
-                        std::cout << "Region: (" << bl.x << ", " << bl.y << "); (" << tr.x << ", " << tr.y << ") Depth = " << depth << std::endl;
+                        std::cout << "Region: (" << bl.x << ", " << bl.y << "); (" << tr.x << ", " << tr.y << ") Depth = " << 0 << std::endl;
 
                         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
                 }
@@ -149,8 +156,10 @@ int main(int argc, char**argv)
                                 insert = !insert;
                         }
                 case SDL_KEYDOWN:
-                        if (e.key.keysym.sym == 'a' && depth > -1) depth--;
-                        if (e.key.keysym.sym == 'b') depth++;
+                        if (e.key.keysym.sym == 'w') Y++;
+                        if (e.key.keysym.sym == 'a') X--;
+                        if (e.key.keysym.sym == 's') Y--;
+                        if (e.key.keysym.sym == 'd') X++;
                         break;
                 }
         }
